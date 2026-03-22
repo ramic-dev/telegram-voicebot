@@ -1,0 +1,37 @@
+services:
+  bot:
+    build:
+      context: .
+      dockerfile_inline: |
+        FROM python:3.11-bookworm
+        RUN apt-get update && apt-get install -y --no-install-recommends \
+            ffmpeg libsndfile1 && rm -rf /var/lib/apt/lists/*
+        RUN pip install --no-cache-dir --upgrade pip setuptools wheel
+        RUN pip install --no-cache-dir \
+            torch torchaudio --index-url https://download.pytorch.org/whl/cpu
+        RUN pip install --no-cache-dir \
+            openai-whisper python-telegram-bot httpx soundfile aider-chat
+        RUN pip install --no-cache-dir "coqui-tts==0.27.5" "transformers>=4.57,<5"
+        RUN python -c "import pathlib, site; \
+            p = pathlib.Path(site.getsitepackages()[0]) / 'TTS' / '__init__.py'; \
+            t = p.read_text(); \
+            t = t.replace('raise ImportError(TORCHCODEC_IMPORT_ERROR)', 'pass  # torchcodec not needed for inference'); \
+            p.write_text(t); \
+            print('Patched TTS/__init__.py: torchcodec check bypassed')"
+        WORKDIR /app
+        COPY bot.py default_speaker.pt ./
+        ENV COQUI_TOS_AGREED=1 FFMPEG_BIN=ffmpeg SPEAKER_FILE=/app/default_speaker.pt
+        CMD ["python", "bot.py"]
+    env_file: .env
+    volumes:
+      - whisper-cache:/root/.cache/whisper
+      - tts-cache:/root/.local/share/tts
+      - ./bot.py:/app/bot.py:ro
+      - ./:/host:ro
+    environment:
+      - SPEAKER_FILE=${SPEAKER_FILE:-}
+    restart: unless-stopped
+
+volumes:
+  whisper-cache:
+  tts-cache:

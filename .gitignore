@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+*.pyo
+Thumbs.db
+.DS_Store
+.env
+.speaker.pt
